@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Caricamento Asset GitHub</title>
+    <style>
+        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #222; color: white; font-family: sans-serif; }
+        canvas { border: 2px solid #fff; background-color: #000; max-width: 100%; }
+        #status { position: absolute; top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="status">Caricamento immagine...</div>
+    <canvas id="gameCanvas" width="800" height="450"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusDiv = document.getElementById('status');
+
+        // --- CONFIGURAZIONE ---
+        // Sostituisci questo URL con quello del tuo file su GitHub Pages
+        const imgUrl = "https://tuo-nome-utente.github.io/mio-gioco-test/background.png";
+
+        const background = new Image();
+        background.crossOrigin = "anonymous"; // Previene problemi di sicurezza (CORS)
+        background.src = imgUrl;
+
+        // Gestione dell'evento di caricamento
+        background.onload = function() {
+            statusDiv.innerText = "Immagine caricata con successo!";
+            // Disegna l'immagine adattandola alle dimensioni del canvas
+            ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+            
+            // Aggiungiamo un testo sopra per conferma
+            ctx.fillStyle = "white";
+            ctx.font = "30px Arial";
+            ctx.fillText("Gioco Pronto!", 50, 50);
+        };
+
+        // Gestione errori (es. URL sbagliato)
+        background.onerror = function() {
+            statusDiv.innerText = "Errore: Impossibile caricare l'immagine. Controlla l'URL.";
+            statusDiv.style.color = "red";
+        };
+    </script>
+</body>
+</html>
