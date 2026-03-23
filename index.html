@@ -3,48 +3,199 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Caricamento Asset GitHub</title>
+    <title>Animal 2048 - Sprite Edition</title>
     <style>
-        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #222; color: white; font-family: sans-serif; }
-        canvas { border: 2px solid #fff; background-color: #000; max-width: 100%; }
-        #status { position: absolute; top: 10px; }
+        body {
+            margin: 0;
+            background: #2c3e50;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        canvas {
+            background-color: #bbada0;
+            border-radius: 6px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            max-width: 95vw;
+            max-height: 80vh;
+        }
+        .header { text-align: center; margin-bottom: 20px; }
+        h1 { margin: 0; font-size: 48px; }
+        .score { font-size: 24px; background: #8f7a66; padding: 10px 20px; border-radius: 5px; }
     </style>
 </head>
 <body>
 
-    <div id="status">Caricamento immagine...</div>
-    <canvas id="gameCanvas" width="800" height="450"></canvas>
+    <div class="header">
+        <h1>Animal 2048</h1>
+        <div class="score">Punti: <span id="scoreVal">0</span></div>
+    </div>
+
+    <canvas id="gameCanvas" width="500" height="500"></canvas>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const statusDiv = document.getElementById('status');
+        const scoreDisplay = document.getElementById('scoreVal');
 
-        // --- CONFIGURAZIONE ---
-        // Sostituisci questo URL con quello del tuo file su GitHub Pages
-        const imgUrl = "https://zombiemayem-del.github.io/testHTML/assets/background.png";
+        // --- CONFIGURAZIONE ASSET ---
+        // Sostituisci questo URL con il tuo file caricato su GitHub
+        const SPRITE_URL = "https://zombiemayem-del.github.io/testHTML/assets/sprite_sheet.png";
+        
+        const spriteSheet = new Image();
+        spriteSheet.crossOrigin = "anonymous";
+        spriteSheet.src = SPRITE_URL;
 
-        const background = new Image();
-        background.crossOrigin = "anonymous"; // Previene problemi di sicurezza (CORS)
-        background.src = imgUrl;
+        // Parametri Griglia
+        const GRID_SIZE = 4;
+        const TILE_MARGIN = 10;
+        const TILE_SIZE = (canvas.width - (TILE_MARGIN * (GRID_SIZE + 1))) / GRID_SIZE;
 
-        // Gestione dell'evento di caricamento
-        background.onload = function() {
-            statusDiv.innerText = "Immagine caricata con successo!";
-            // Disegna l'immagine adattandola alle dimensioni del canvas
-            ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+        // Dimensioni degli animali nello sprite sheet (1024x1024 totali / 4 col e 3 righe)
+        const SOURCE_W = 256; 
+        const SOURCE_H = 341; // Approssimato per 3 righe
+
+        // Mappa Valore -> Indice Animale (0-11)
+        const tileToAnimalIndex = {
+            2: 0, 4: 1, 8: 2, 16: 3, 32: 4, 64: 5, 
+            128: 6, 256: 7, 512: 8, 1024: 9, 2048: 10
+        };
+
+        let grid = [];
+        let score = 0;
+
+        // --- LOGICA DI GIOCO ---
+
+        function init() {
+            // Inizializza griglia vuota
+            for(let i=0; i<GRID_SIZE; i++) {
+                grid[i] = new Array(GRID_SIZE).fill(0);
+            }
+            addRandomTile();
+            addRandomTile();
+            draw();
+        }
+
+        function addRandomTile() {
+            let emptyCells = [];
+            for(let r=0; r<GRID_SIZE; r++) {
+                for(let c=0; c<GRID_SIZE; c++) {
+                    if(grid[r][c] === 0) emptyCells.push({r, c});
+                }
+            }
+            if(emptyCells.length > 0) {
+                let cell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                grid[cell.r][cell.c] = Math.random() < 0.9 ? 2 : 4;
+            }
+        }
+
+        // --- DISEGNO ---
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Aggiungiamo un testo sopra per conferma
-            ctx.fillStyle = "white";
-            ctx.font = "30px Arial";
-            ctx.fillText("Gioco Pronto!", 50, 50);
-        };
+            // Sfondo celle vuote
+            ctx.fillStyle = "rgba(238, 228, 218, 0.35)";
+            for(let r=0; r<GRID_SIZE; r++) {
+                for(let c=0; c<GRID_SIZE; c++) {
+                    drawRect(c, r);
+                    if(grid[r][c] !== 0) {
+                        drawAnimal(grid[r][c], c, r);
+                    }
+                }
+            }
+            scoreDisplay.innerText = score;
+        }
 
-        // Gestione errori (es. URL sbagliato)
-        background.onerror = function() {
-            statusDiv.innerText = "Errore: Impossibile caricare l'immagine. Controlla l'URL.";
-            statusDiv.style.color = "red";
-        };
+        function drawRect(c, r) {
+            let x = TILE_MARGIN + c * (TILE_SIZE + TILE_MARGIN);
+            let y = TILE_MARGIN + r * (TILE_SIZE + TILE_MARGIN);
+            ctx.beginPath();
+            ctx.roundRect(x, y, TILE_SIZE, TILE_SIZE, 5);
+            ctx.fill();
+        }
+
+        function drawAnimal(value, c, r) {
+            const index = tileToAnimalIndex[value];
+            if (index === undefined) return;
+
+            const col = index % 4;
+            const row = Math.floor(index / 4);
+
+            let x = TILE_MARGIN + c * (TILE_SIZE + TILE_MARGIN);
+            let y = TILE_MARGIN + r * (TILE_SIZE + TILE_MARGIN);
+
+            ctx.drawImage(
+                spriteSheet,
+                col * SOURCE_W, row * SOURCE_H, SOURCE_W, SOURCE_H, // Source
+                x, y, TILE_SIZE, TILE_SIZE // Destination
+            );
+        }
+
+        // --- MOVIMENTI ---
+
+        function slide(row) {
+            let arr = row.filter(val => val);
+            let missing = GRID_SIZE - arr.length;
+            let zeros = new Array(missing).fill(0);
+            return arr.concat(zeros);
+        }
+
+        function combine(row) {
+            for (let i = 0; i < GRID_SIZE - 1; i++) {
+                if (row[i] !== 0 && row[i] === row[i + 1]) {
+                    row[i] *= 2;
+                    score += row[i];
+                    row[i + 1] = 0;
+                }
+            }
+            return row;
+        }
+
+        function operate(row) {
+            row = slide(row);
+            row = combine(row);
+            row = slide(row);
+            return row;
+        }
+
+        window.addEventListener('keydown', (e) => {
+            let flipped = false;
+            let rotated = false;
+            let oldGrid = JSON.stringify(grid);
+
+            if (e.key === "ArrowRight") {
+                grid = grid.map(row => operate(row.reverse()).reverse());
+            } else if (e.key === "ArrowLeft") {
+                grid = grid.map(row => operate(row));
+            } else if (e.key === "ArrowUp") {
+                grid = rotateGrid(grid);
+                grid = grid.map(row => operate(row));
+                grid = rotateGrid(grid, true);
+            } else if (e.key === "ArrowDown") {
+                grid = rotateGrid(grid);
+                grid = grid.map(row => operate(row.reverse()).reverse());
+                grid = rotateGrid(grid, true);
+            }
+
+            if (oldGrid !== JSON.stringify(grid)) {
+                addRandomTile();
+                draw();
+            }
+        });
+
+        function rotateGrid(matrix, reverse = false) {
+            let newGrid = matrix[0].map((_, colIndex) => matrix.map(row => row[colIndex]));
+            return reverse ? newGrid : newGrid.map(row => row.reverse());
+        }
+
+        spriteSheet.onload = init;
+
     </script>
 </body>
 </html>
