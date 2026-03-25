@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-    <title>Animal 2048 - Mobile Edition</title>
+    <title>Animal 2048 - Calibrated Edition</title>
     <style>
         :root {
             --bg-color: #2c3e50;
@@ -17,7 +17,7 @@
             margin: 0;
             background: var(--bg-color);
             color: white;
-            font-family: 'Arial', sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -30,17 +30,17 @@
 
         .game-header {
             text-align: center;
-            margin-bottom: 5vh; /* Distanza in percentuale dell'altezza della visuale */
+            margin-bottom: 20px; /* Distanza fissa per desktop */
             z-index: 10;
         }
 
-        h1 { margin: 0; font-size: 8vw; font-weight: bold; }
+        h1 { margin: 0; font-size: 40px; font-weight: bold; } /* Font size fisso per desktop */
 
         .score-container {
             background: var(--score-bg);
-            padding: 8px 15px;
+            padding: 10px 20px;
             border-radius: 5px;
-            font-size: 5vw;
+            font-size: 24px; /* Font size fisso per desktop */
             font-weight: bold;
             display: inline-block;
             margin-top: 5px;
@@ -49,7 +49,7 @@
         canvas {
             border-radius: 8px;
             box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-            /* Dimensioni responsive per mobile (sempre quadrato) */
+            /* Dimensioni responsive capped a 500px */
             width: 90vw; 
             height: 90vw;
             max-width: 500px;
@@ -57,18 +57,27 @@
             cursor: pointer;
         }
 
-        .controls { margin-top: 3vh; z-index: 10; }
+        .controls { margin-top: 20px; z-index: 10; }
         button {
             background: #e67e22;
             border: none;
             color: white;
-            padding: 10px 20px;
+            padding: 12px 24px;
             border-radius: 5px;
-            font-size: 4vw;
+            font-size: 18px; /* Font size fisso per desktop */
             cursor: pointer;
             font-weight: bold;
         }
         button:hover { background: #d35400; }
+
+        /* Media queries per correggere UI su schermi molto piccoli (mobile portrait) */
+        @media (max-width: 400px) {
+            h1 { font-size: 10vw; }
+            .score-container { font-size: 6vw; padding: 5px 10px;}
+            button { font-size: 5vw; padding: 10px 20px; }
+            .game-header { margin-bottom: 10px; }
+            .controls { margin-top: 10px; }
+        }
 
     </style>
 </head>
@@ -82,15 +91,17 @@
     <canvas id="gameCanvas" width="500" height="500"></canvas>
 
     <div class="controls">
-        <button onclick="init()">Riavvia Gioco</button>
+        <button id="restartBtn">Riavvia Gioco</button>
     </div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreDisplay = document.getElementById('scoreVal');
+        const restartBtn = document.getElementById('restartBtn');
 
         // --- 1. CONFIGURAZIONE ASSET (URL GitHub) ---
+        // Sostituisci "testHTML" con il tuo nome repo reale se diverso.
         const GITHUB_BASE = "https://zombiemayem-del.github.io/testHTML/assets/";
         const SPRITE_URL = GITHUB_BASE + "sprite_sheet.png?v=3";
         const BG_URL = GITHUB_BASE + "background.png?v=2";
@@ -104,20 +115,21 @@
         const totalToLoad = 2;
 
         // --- 2. PARAMETRI DI CALIBRAZIONE PER EVITARE TAGLI ---
-        // cols/rows nello sprite sheet. offsetX/offsetY sono stati impostati a 0 e lo zoom a 0.7 per un centramento pulito.
+        // cols/rows nello sprite sheet. Lo zoom è stato ridotto al 70% per centrare perfettamente.
         const CALIBRATION = {
             cols: 4, rows: 3,
             offsetX: 0, offsetY: 0,
-            animalZoom: 0.75  // 0.7 = L'animale è il 70% della dimensione della casella, perfetto per centrarlo
+            animalZoom: 0.7  // 0.7 = L'animale è il 70% della dimensione della casella, perfetto per centrarlo
         };
 
         const GRID_SIZE = 4;
         const TILE_MARGIN = 12;
         const TILE_SIZE = (canvas.width - (TILE_MARGIN * (GRID_SIZE + 1))) / GRID_SIZE;
 
+        // Mappa Valore -> Indice Animale (0-11) per 12 animali totali (fino a 4096)
         const tileToAnimalIndex = {
             2: 0, 4: 1, 8: 2, 16: 3, 32: 4, 64: 5, 
-            128: 6, 256: 7, 512: 8, 1024: 9, 2048: 10
+            128: 6, 256: 7, 512: 8, 1024: 9, 2048: 10, 4096: 11
         };
 
         let grid = [];
@@ -127,15 +139,18 @@
 
         function checkAssetsLoaded() {
             loadedCount++;
-            if (loadedCount === totalToLoad) { init(); }
+            if (loadedCount === totalToLoad) {
+                console.log("Tutti gli asset caricati correttamente!");
+                init();
+            }
         }
 
         spriteSheet.onload = checkAssetsLoaded;
         bgImage.onload = checkAssetsLoaded;
-        spriteSheet.onerror = () => alert("Errore: Impossibile caricare sprite_sheet.png.");
-        bgImage.onerror = () => alert("Errore: Impossibile caricare background.png.");
+        spriteSheet.onerror = () => alert("Errore: Impossibile caricare sprite_sheet.png da GitHub.");
+        bgImage.onerror = () => alert("Errore: Impossibile caricare background.png da GitHub.");
 
-        // AVVIA CARICAMENTO
+        // AVVIA CARICAMENTO CON CACHE UPDATE
         spriteSheet.src = SPRITE_URL;
         bgImage.src = BG_URL;
 
@@ -188,7 +203,7 @@
             }
         }
 
-        // NUOVA FUNZIONE: Ritaglia l'animale intero e lo scala per centrarlo
+        // NUOVA FUNZIONE CALIBRATA: Ritaglia l'animale intero e lo scala per centrarlo
         function drawAnimalCentered(value, destX, destY) {
             const index = tileToAnimalIndex[value];
             if (index === undefined) return;
@@ -203,16 +218,14 @@
             const sx = col * sw + CALIBRATION.offsetX;
             const sy = row * sh + CALIBRATION.offsetY;
 
-            // Applichiamo lo zoom sulla destinazione per centrarlo
-            //sw * CALIBRATION.zoom, sh * CALIBRATION.zoom
-
-            // Calcolo corretto del padding per non ritagliare eccessivamente e centrare
+            // Calcolo corretto del padding per centrare l'animale al 70% di scale
             const padding = (TILE_SIZE * (1 - CALIBRATION.animalZoom)) / 2;
             const drawSize = TILE_SIZE * CALIBRATION.animalZoom;
 
+            // Ritaglia l'animale intero (sw, sh) e lo disegna più piccolo al centro (drawSize, drawSize)
             ctx.drawImage(
                 spriteSheet,
-                sx, sy, sw * CALIBRATION.animalZoom, sh * CALIBRATION.animalZoom, // Sorgente
+                sx, sy, sw, sh, // Sorgente (ritaglio intero)
                 destX + padding, destY + padding, drawSize, drawSize // Destinazione (scalata e centrata)
             );
         }
@@ -261,7 +274,10 @@
             }
         }
 
-        // --- 6. GESTIONE INPUT (Tastiera + Swipe Touch) ---
+        // --- 6. GESTIONE INPUT (Tastiera + Swipe Touch + Restart) ---
+
+        // Restart button
+        restartBtn.addEventListener('click', init);
 
         // Tastiera
         window.addEventListener('keydown', (e) => {
@@ -271,7 +287,7 @@
             else if (e.key === "ArrowDown") updateGrid("down");
         });
 
-        // NUOVO: Gestione Swipe Touch per mobile
+        // Gestione Swipe Touch per mobile
         let touchStartX, touchStartY;
         const SWIPE_THRESHOLD = 30; // Distanza minima in pixel per registrare uno swipe
 
@@ -288,6 +304,10 @@
 
             const diffX = touchEndX - touchStartX;
             const diffY = touchEndY - touchStartY;
+
+            // Resetta i valori per il prossimo tocco
+            touchStartX = null;
+            touchStartY = null;
 
             // Determina la direzione dello swipe
             if (Math.abs(diffX) > Math.abs(diffY)) {
