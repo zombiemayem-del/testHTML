@@ -2,65 +2,95 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Animal 2048 - Sprite Edition</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Animal 2048 Pro</title>
     <style>
+        :root {
+            --bg-color: #2c3e50;
+            --grid-bg: #bbada0;
+            --cell-bg: rgba(238, 228, 218, 0.35);
+        }
         body {
             margin: 0;
-            background: #2c3e50;
+            background: var(--bg-color);
             color: white;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Arial', sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             height: 100vh;
-            overflow: hidden;
+            touch-action: none; /* Impedisce lo scroll mentre si gioca su mobile */
+        }
+        .header { text-align: center; margin-bottom: 10px; }
+        .score-container {
+            background: #8f7a66;
+            padding: 10px 25px;
+            border-radius: 5px;
+            font-size: 24px;
+            font-weight: bold;
+            margin-top: 5px;
         }
         canvas {
-            background-color: #bbada0;
-            border-radius: 6px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            background-color: var(--grid-bg);
+            border-radius: 8px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
             max-width: 95vw;
-            max-height: 80vh;
+            max-height: 70vh;
+            cursor: pointer;
         }
-        .header { text-align: center; margin-bottom: 20px; }
-        h1 { margin: 0; font-size: 48px; }
-        .score { font-size: 24px; background: #8f7a66; padding: 10px 20px; border-radius: 5px; }
+        .controls { margin-top: 15px; }
+        button {
+            background: #e67e22;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 18px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover { background: #d35400; }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <h1>Animal 2048</h1>
-        <div class="score">Punti: <span id="scoreVal">0</span></div>
+        <h1 style="margin:0">Animal 2048</h1>
+        <div class="score-container">Punti: <span id="scoreVal">0</span></div>
     </div>
 
     <canvas id="gameCanvas" width="500" height="500"></canvas>
+
+    <div class="controls">
+        <button onclick="init()">Riavvia Gioco</button>
+    </div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreDisplay = document.getElementById('scoreVal');
 
-        // --- CONFIGURAZIONE ASSET ---
-        // Sostituisci questo URL con il tuo file caricato su GitHub
-        const SPRITE_URL = "https://zombiemayem-del.github.io/testHTML/assets/sprite_sheet.png";
+        // --- 1. CONFIGURAZIONE ASSET ---
+        const SPRITE_URL = "https://zombiemayem-del.github.io/testHTML/assets/sprite_sheet.png?v=2";
         
         const spriteSheet = new Image();
         spriteSheet.crossOrigin = "anonymous";
         spriteSheet.src = SPRITE_URL;
 
-        // Parametri Griglia
+        // --- 2. PARAMETRI DI CALIBRAZIONE (Modifica questi per centrare gli animali) ---
+        const CALIBRATION = {
+            cols: 4,      // Numero colonne nello sprite sheet
+            rows: 3,      // Numero righe nello sprite sheet
+            offsetX: 5,   // Sposta il ritaglio a destra/sinistra (pixel)
+            offsetY: 10,  // Sposta il ritaglio su/giù (pixel)
+            zoom: 0.85    // 1.0 = dimensione piena, 0.8 = lascia un po' di bordo intorno all'animale
+        };
+
         const GRID_SIZE = 4;
-        const TILE_MARGIN = 10;
+        const TILE_MARGIN = 12;
         const TILE_SIZE = (canvas.width - (TILE_MARGIN * (GRID_SIZE + 1))) / GRID_SIZE;
 
-        // Dimensioni degli animali nello sprite sheet (1024x1024 totali / 4 col e 3 righe)
-        const SOURCE_W = 256; 
-        const SOURCE_H = 341; // Approssimato per 3 righe
-
-        // Mappa Valore -> Indice Animale (0-11)
         const tileToAnimalIndex = {
             2: 0, 4: 1, 8: 2, 16: 3, 32: 4, 64: 5, 
             128: 6, 256: 7, 512: 8, 1024: 9, 2048: 10
@@ -69,13 +99,11 @@
         let grid = [];
         let score = 0;
 
-        // --- LOGICA DI GIOCO ---
+        // --- 3. LOGICA DI GIOCO ---
 
         function init() {
-            // Inizializza griglia vuota
-            for(let i=0; i<GRID_SIZE; i++) {
-                grid[i] = new Array(GRID_SIZE).fill(0);
-            }
+            grid = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(0));
+            score = 0;
             addRandomTile();
             addRandomTile();
             draw();
@@ -94,56 +122,62 @@
             }
         }
 
-        // --- DISEGNO ---
+        // --- 4. MOTORE GRAFICO ---
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Sfondo celle vuote
-            ctx.fillStyle = "rgba(238, 228, 218, 0.35)";
+            scoreDisplay.innerText = score;
+
             for(let r=0; r<GRID_SIZE; r++) {
                 for(let c=0; c<GRID_SIZE; c++) {
-                    drawRect(c, r);
+                    let x = TILE_MARGIN + c * (TILE_SIZE + TILE_MARGIN);
+                    let y = TILE_MARGIN + r * (TILE_SIZE + TILE_MARGIN);
+
+                    // Disegna sfondo cella vuota
+                    ctx.fillStyle = "rgba(238, 228, 218, 0.35)";
+                    ctx.beginPath();
+                    ctx.roundRect(x, y, TILE_SIZE, TILE_SIZE, 8);
+                    ctx.fill();
+
                     if(grid[r][c] !== 0) {
-                        drawAnimal(grid[r][c], c, r);
+                        drawAnimal(grid[r][c], x, y);
                     }
                 }
             }
-            scoreDisplay.innerText = score;
         }
 
-        function drawRect(c, r) {
-            let x = TILE_MARGIN + c * (TILE_SIZE + TILE_MARGIN);
-            let y = TILE_MARGIN + r * (TILE_SIZE + TILE_MARGIN);
-            ctx.beginPath();
-            ctx.roundRect(x, y, TILE_SIZE, TILE_SIZE, 5);
-            ctx.fill();
-        }
-
-        function drawAnimal(value, c, r) {
+        function drawAnimal(value, destX, destY) {
             const index = tileToAnimalIndex[value];
             if (index === undefined) return;
 
-            const col = index % 4;
-            const row = Math.floor(index / 4);
+            const col = index % CALIBRATION.cols;
+            const row = Math.floor(index / CALIBRATION.cols);
 
-            let x = TILE_MARGIN + c * (TILE_SIZE + TILE_MARGIN);
-            let y = TILE_MARGIN + r * (TILE_SIZE + TILE_MARGIN);
+            // Dimensioni dinamiche basate sull'immagine reale caricata
+            const sw = spriteSheet.width / CALIBRATION.cols;
+            const sh = spriteSheet.height / CALIBRATION.rows;
+
+            // Coordinate di ritaglio con applicazione degli offset
+            const sx = col * sw + CALIBRATION.offsetX;
+            const sy = row * sh + CALIBRATION.offsetY;
+
+            // Applichiamo lo zoom per evitare che i bordi dell'animale tocchino i margini della tessera
+            const padding = (TILE_SIZE * (1 - CALIBRATION.zoom)) / 2;
+            const drawSize = TILE_SIZE * CALIBRATION.zoom;
 
             ctx.drawImage(
                 spriteSheet,
-                col * SOURCE_W, row * SOURCE_H, SOURCE_W, SOURCE_H, // Source
-                x, y, TILE_SIZE, TILE_SIZE // Destination
+                sx, sy, sw * CALIBRATION.zoom, sh * CALIBRATION.zoom, // Sorgente
+                destX + padding, destY + padding, drawSize, drawSize // Destinazione
             );
         }
 
-        // --- MOVIMENTI ---
+        // --- 5. MOVIMENTI E INPUT ---
 
         function slide(row) {
             let arr = row.filter(val => val);
             let missing = GRID_SIZE - arr.length;
-            let zeros = new Array(missing).fill(0);
-            return arr.concat(zeros);
+            return arr.concat(new Array(missing).fill(0));
         }
 
         function combine(row) {
@@ -164,23 +198,25 @@
             return row;
         }
 
-        window.addEventListener('keydown', (e) => {
-            let flipped = false;
-            let rotated = false;
-            let oldGrid = JSON.stringify(grid);
+        function rotateGrid(matrix) {
+            return matrix[0].map((_, colIndex) => matrix.map(row => row[colIndex]).reverse());
+        }
 
-            if (e.key === "ArrowRight") {
+        window.addEventListener('keydown', (e) => {
+            let oldGrid = JSON.stringify(grid);
+            
+            if (e.key === "ArrowLeft") {
+                grid = grid.map(row => operate(row));
+            } else if (e.key === "ArrowRight") {
                 grid = grid.map(row => operate(row.reverse()).reverse());
-            } else if (e.key === "ArrowLeft") {
-                grid = grid.map(row => operate(row));
             } else if (e.key === "ArrowUp") {
-                grid = rotateGrid(grid);
+                grid = rotateGrid(rotateGrid(rotateGrid(grid)));
                 grid = grid.map(row => operate(row));
-                grid = rotateGrid(grid, true);
+                grid = rotateGrid(grid);
             } else if (e.key === "ArrowDown") {
                 grid = rotateGrid(grid);
-                grid = grid.map(row => operate(row.reverse()).reverse());
-                grid = rotateGrid(grid, true);
+                grid = grid.map(row => operate(row));
+                grid = rotateGrid(rotateGrid(rotateGrid(grid)));
             }
 
             if (oldGrid !== JSON.stringify(grid)) {
@@ -189,12 +225,15 @@
             }
         });
 
-        function rotateGrid(matrix, reverse = false) {
-            let newGrid = matrix[0].map((_, colIndex) => matrix.map(row => row[colIndex]));
-            return reverse ? newGrid : newGrid.map(row => row.reverse());
-        }
+        // Caricamento e avvio
+        spriteSheet.onload = () => {
+            console.log("Sprite caricata correttamente!");
+            init();
+        };
 
-        spriteSheet.onload = init;
+        spriteSheet.onerror = () => {
+            alert("Errore: Impossibile caricare le immagini da GitHub.");
+        };
 
     </script>
 </body>
