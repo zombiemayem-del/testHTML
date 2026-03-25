@@ -2,14 +2,17 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Animal 2048 Pro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>Animal 2048 - Mobile Edition</title>
     <style>
         :root {
             --bg-color: #2c3e50;
-            --grid-bg: rgba(187, 173, 160, 0.5); /* Reso leggermente trasparente per far vedere lo sfondo sotto */
-            --cell-bg: rgba(238, 228, 218, 0.35);
+            --score-bg: #8f7a66;
+            --grid-bg: rgba(187, 173, 160, 0.5); /* Sfondo griglia trasparente per lo sfondo */
         }
+        
+        * { box-sizing: border-box; }
+
         body {
             margin: 0;
             background: var(--bg-color);
@@ -20,42 +23,59 @@
             align-items: center;
             justify-content: center;
             height: 100vh;
+            /* Impedisce lo scroll di sistema mentre si gioca */
             touch-action: none;
+            overflow: hidden;
         }
-        .header { text-align: center; margin-bottom: 10px; z-index: 10; }
+
+        .game-header {
+            text-align: center;
+            margin-bottom: 5vh; /* Distanza in percentuale dell'altezza della visuale */
+            z-index: 10;
+        }
+
+        h1 { margin: 0; font-size: 8vw; font-weight: bold; }
+
         .score-container {
-            background: #8f7a66;
-            padding: 10px 25px;
+            background: var(--score-bg);
+            padding: 8px 15px;
             border-radius: 5px;
-            font-size: 24px;
+            font-size: 5vw;
             font-weight: bold;
+            display: inline-block;
             margin-top: 5px;
         }
+
         canvas {
             border-radius: 8px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
-            max-width: 95vw;
-            max-height: 70vh;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            /* Dimensioni responsive per mobile (sempre quadrato) */
+            width: 90vw; 
+            height: 90vw;
+            max-width: 500px;
+            max-height: 500px;
             cursor: pointer;
         }
-        .controls { margin-top: 15px; z-index: 10; }
+
+        .controls { margin-top: 3vh; z-index: 10; }
         button {
             background: #e67e22;
             border: none;
             color: white;
             padding: 10px 20px;
             border-radius: 5px;
-            font-size: 18px;
+            font-size: 4vw;
             cursor: pointer;
             font-weight: bold;
         }
         button:hover { background: #d35400; }
+
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <h1 style="margin:0">Animal 2048</h1>
+    <div class="game-header">
+        <h1>Animal 2048</h1>
         <div class="score-container">Punti: <span id="scoreVal">0</span></div>
     </div>
 
@@ -70,27 +90,25 @@
         const ctx = canvas.getContext('2d');
         const scoreDisplay = document.getElementById('scoreVal');
 
-        // --- 1. CONFIGURAZIONE ASSET ---
+        // --- 1. CONFIGURAZIONE ASSET (URL GitHub) ---
         const GITHUB_BASE = "https://zombiemayem-del.github.io/testHTML/assets/";
-        const SPRITE_URL = GITHUB_BASE + "sprite_sheet.png?v=2";
-        const BG_URL = GITHUB_BASE + "background.png?v=1"; // NUOVO: URL dello sfondo
+        const SPRITE_URL = GITHUB_BASE + "sprite_sheet.png?v=3";
+        const BG_URL = GITHUB_BASE + "background.png?v=2";
         
-        let loadedCount = 0;
-        const totalToLoad = 2; // Sprite + Sfondo
-
         const spriteSheet = new Image();
         spriteSheet.crossOrigin = "anonymous";
-        // Non impostiamo .src qui, lo facciamo alla fine dopo aver impostato gli onload
-
-        const bgImage = new Image(); // NUOVO: Oggetto per l'immagine di sfondo
+        const bgImage = new Image();
         bgImage.crossOrigin = "anonymous";
-        // Non impostiamo .src qui
 
-        // --- 2. PARAMETRI DI CALIBRAZIONE ---
+        let loadedCount = 0;
+        const totalToLoad = 2;
+
+        // --- 2. PARAMETRI DI CALIBRAZIONE PER EVITARE TAGLI ---
+        // cols/rows nello sprite sheet. offsetX/offsetY sono stati impostati a 0 e lo zoom a 0.7 per un centramento pulito.
         const CALIBRATION = {
             cols: 4, rows: 3,
-            offsetX: 15, offsetY: -5,
-            zoom: 0.85
+            offsetX: 0, offsetY: 0,
+            animalZoom: 0.75  // 0.7 = L'animale è il 70% della dimensione della casella, perfetto per centrarlo
         };
 
         const GRID_SIZE = 4;
@@ -105,28 +123,24 @@
         let grid = [];
         let score = 0;
 
-        // --- 3. GESTIONE CARICAMENTO ASSET ---
+        // --- GESTIONE CARICAMENTO ASSET ---
 
         function checkAssetsLoaded() {
             loadedCount++;
-            if (loadedCount === totalToLoad) {
-                console.log("Tutti gli asset caricati correttamente!");
-                init(); // Avvia il gioco solo quando TUTTO è pronto
-            }
+            if (loadedCount === totalToLoad) { init(); }
         }
 
         spriteSheet.onload = checkAssetsLoaded;
         bgImage.onload = checkAssetsLoaded;
+        spriteSheet.onerror = () => alert("Errore: Impossibile caricare sprite_sheet.png.");
+        bgImage.onerror = () => alert("Errore: Impossibile caricare background.png.");
 
-        spriteSheet.onerror = () => alert("Errore: Impossibile caricare sprite_sheet.png da GitHub.");
-        bgImage.onerror = () => alert("Errore: Impossibile caricare background.png da GitHub.");
-
-        // AVVIA IL CARICAMENTO
+        // AVVIA CARICAMENTO
         spriteSheet.src = SPRITE_URL;
         bgImage.src = BG_URL;
 
 
-        // --- 4. LOGICA DI GIOCO ---
+        // --- 3. LOGICA DI GIOCO ---
 
         function init() {
             grid = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(0));
@@ -149,13 +163,11 @@
             }
         }
 
-        // --- 5. MOTORE GRAFICO ---
+        // --- 4. MOTORE GRAFICO (Ritaglio pulito e responsive) ---
 
         function draw() {
-            // --- NUOVO: Disegna lo Sfondo PRIMA di tutto il resto ---
+            // Sfondo
             ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
-
-            // ctx.clearRect(0, 0, canvas.width, canvas.height); // Non più necessario se disegniamo lo sfondo sopra
             scoreDisplay.innerText = score;
 
             for(let r=0; r<GRID_SIZE; r++) {
@@ -163,43 +175,49 @@
                     let x = TILE_MARGIN + c * (TILE_SIZE + TILE_MARGIN);
                     let y = TILE_MARGIN + r * (TILE_SIZE + TILE_MARGIN);
 
-                    // Disegna sfondo cella vuota (reso trasparente nel CSS per far vedere lo sfondo)
+                    // Sfondo cella vuota (reso trasparente nel CSS)
                     ctx.fillStyle = "rgba(238, 228, 218, 0.35)";
                     ctx.beginPath();
                     ctx.roundRect(x, y, TILE_SIZE, TILE_SIZE, 8);
                     ctx.fill();
 
                     if(grid[r][c] !== 0) {
-                        drawAnimal(grid[r][c], x, y);
+                        drawAnimalCentered(grid[r][c], x, y);
                     }
                 }
             }
         }
 
-        function drawAnimal(value, destX, destY) {
+        // NUOVA FUNZIONE: Ritaglia l'animale intero e lo scala per centrarlo
+        function drawAnimalCentered(value, destX, destY) {
             const index = tileToAnimalIndex[value];
             if (index === undefined) return;
 
             const col = index % CALIBRATION.cols;
             const row = Math.floor(index / CALIBRATION.cols);
 
+            // Dimensioni ritaglio da sorgente (intere, senza zoom)
             const sw = spriteSheet.width / CALIBRATION.cols;
             const sh = spriteSheet.height / CALIBRATION.rows;
 
             const sx = col * sw + CALIBRATION.offsetX;
             const sy = row * sh + CALIBRATION.offsetY;
 
-            const padding = (TILE_SIZE * (1 - CALIBRATION.zoom)) / 2;
-            const drawSize = TILE_SIZE * CALIBRATION.zoom;
+            // Applichiamo lo zoom sulla destinazione per centrarlo
+            //sw * CALIBRATION.zoom, sh * CALIBRATION.zoom
+
+            // Calcolo corretto del padding per non ritagliare eccessivamente e centrare
+            const padding = (TILE_SIZE * (1 - CALIBRATION.animalZoom)) / 2;
+            const drawSize = TILE_SIZE * CALIBRATION.animalZoom;
 
             ctx.drawImage(
                 spriteSheet,
-                sx, sy, sw * CALIBRATION.zoom, sh * CALIBRATION.zoom, // Sorgente
-                destX + padding, destY + padding, drawSize, drawSize // Destinazione
+                sx, sy, sw * CALIBRATION.animalZoom, sh * CALIBRATION.animalZoom, // Sorgente
+                destX + padding, destY + padding, drawSize, drawSize // Destinazione (scalata e centrata)
             );
         }
 
-        // --- 6. MOVIMENTI E INPUT ---
+        // --- 5. MOVIMENTI ---
 
         function slide(row) {
             let arr = row.filter(val => val);
@@ -229,28 +247,63 @@
             return matrix[0].map((_, colIndex) => matrix.map(row => row[colIndex]).reverse());
         }
 
-        window.addEventListener('keydown', (e) => {
+        function updateGrid(direction) {
             let oldGrid = JSON.stringify(grid);
-            
-            if (e.key === "ArrowLeft") {
-                grid = grid.map(row => operate(row));
-            } else if (e.key === "ArrowRight") {
-                grid = grid.map(row => operate(row.reverse()).reverse());
-            } else if (e.key === "ArrowUp") {
-                grid = rotateGrid(rotateGrid(rotateGrid(grid)));
-                grid = grid.map(row => operate(row));
-                grid = rotateGrid(grid);
-            } else if (e.key === "ArrowDown") {
-                grid = rotateGrid(grid);
-                grid = grid.map(row => operate(row));
-                grid = rotateGrid(rotateGrid(rotateGrid(grid)));
-            }
+
+            if (direction === "left") { grid = grid.map(row => operate(row)); } 
+            else if (direction === "right") { grid = grid.map(row => operate(row.reverse()).reverse()); } 
+            else if (direction === "up") { grid = rotateGrid(rotateGrid(rotateGrid(grid))); grid = grid.map(row => operate(row)); grid = rotateGrid(grid); } 
+            else if (direction === "down") { grid = rotateGrid(grid); grid = grid.map(row => operate(row)); grid = rotateGrid(rotateGrid(rotateGrid(grid))); }
 
             if (oldGrid !== JSON.stringify(grid)) {
                 addRandomTile();
                 draw();
             }
+        }
+
+        // --- 6. GESTIONE INPUT (Tastiera + Swipe Touch) ---
+
+        // Tastiera
+        window.addEventListener('keydown', (e) => {
+            if (e.key === "ArrowLeft") updateGrid("left");
+            else if (e.key === "ArrowRight") updateGrid("right");
+            else if (e.key === "ArrowUp") updateGrid("up");
+            else if (e.key === "ArrowDown") updateGrid("down");
         });
+
+        // NUOVO: Gestione Swipe Touch per mobile
+        let touchStartX, touchStartY;
+        const SWIPE_THRESHOLD = 30; // Distanza minima in pixel per registrare uno swipe
+
+        window.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Impedisce lo scroll della pagina
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        }, { passive: false }); // FONDAMENTALE: passive false permette preventDefault
+
+        window.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+
+            const diffX = touchEndX - touchStartX;
+            const diffY = touchEndY - touchStartY;
+
+            // Determina la direzione dello swipe
+            if (Math.abs(diffX) > Math.abs(diffY)) {
+                // Swipe Orizzontale
+                if (Math.abs(diffX) > SWIPE_THRESHOLD) {
+                    if (diffX > 0) updateGrid("right");
+                    else updateGrid("left");
+                }
+            } else {
+                // Swipe Verticale
+                if (Math.abs(diffY) > SWIPE_THRESHOLD) {
+                    if (diffY > 0) updateGrid("down");
+                    else updateGrid("up");
+                }
+            }
+        }, { passive: false });
 
     </script>
 </body>
