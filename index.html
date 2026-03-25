@@ -7,7 +7,7 @@
     <style>
         :root {
             --bg-color: #2c3e50;
-            --grid-bg: #bbada0;
+            --grid-bg: rgba(187, 173, 160, 0.5); /* Reso leggermente trasparente per far vedere lo sfondo sotto */
             --cell-bg: rgba(238, 228, 218, 0.35);
         }
         body {
@@ -20,9 +20,9 @@
             align-items: center;
             justify-content: center;
             height: 100vh;
-            touch-action: none; /* Impedisce lo scroll mentre si gioca su mobile */
+            touch-action: none;
         }
-        .header { text-align: center; margin-bottom: 10px; }
+        .header { text-align: center; margin-bottom: 10px; z-index: 10; }
         .score-container {
             background: #8f7a66;
             padding: 10px 25px;
@@ -32,14 +32,13 @@
             margin-top: 5px;
         }
         canvas {
-            background-color: var(--grid-bg);
             border-radius: 8px;
             box-shadow: 0 8px 16px rgba(0,0,0,0.3);
             max-width: 95vw;
             max-height: 70vh;
             cursor: pointer;
         }
-        .controls { margin-top: 15px; }
+        .controls { margin-top: 15px; z-index: 10; }
         button {
             background: #e67e22;
             border: none;
@@ -72,19 +71,26 @@
         const scoreDisplay = document.getElementById('scoreVal');
 
         // --- 1. CONFIGURAZIONE ASSET ---
-        const SPRITE_URL = "https://zombiemayem-del.github.io/testHTML/assets/sprite_sheet.png?v=2";
+        const GITHUB_BASE = "https://zombiemayem-del.github.io/testHTML/assets/";
+        const SPRITE_URL = GITHUB_BASE + "sprite_sheet.png?v=2";
+        const BG_URL = GITHUB_BASE + "background.png?v=1"; // NUOVO: URL dello sfondo
         
+        let loadedCount = 0;
+        const totalToLoad = 2; // Sprite + Sfondo
+
         const spriteSheet = new Image();
         spriteSheet.crossOrigin = "anonymous";
-        spriteSheet.src = SPRITE_URL;
+        // Non impostiamo .src qui, lo facciamo alla fine dopo aver impostato gli onload
 
-        // --- 2. PARAMETRI DI CALIBRAZIONE (Modifica questi per centrare gli animali) ---
+        const bgImage = new Image(); // NUOVO: Oggetto per l'immagine di sfondo
+        bgImage.crossOrigin = "anonymous";
+        // Non impostiamo .src qui
+
+        // --- 2. PARAMETRI DI CALIBRAZIONE ---
         const CALIBRATION = {
-            cols: 4,      // Numero colonne nello sprite sheet
-            rows: 3,      // Numero righe nello sprite sheet
-            offsetX: 5,   // Sposta il ritaglio a destra/sinistra (pixel)
-            offsetY: 10,  // Sposta il ritaglio su/giù (pixel)
-            zoom: 0.85    // 1.0 = dimensione piena, 0.8 = lascia un po' di bordo intorno all'animale
+            cols: 4, rows: 3,
+            offsetX: 15, offsetY: -5,
+            zoom: 0.85
         };
 
         const GRID_SIZE = 4;
@@ -99,7 +105,28 @@
         let grid = [];
         let score = 0;
 
-        // --- 3. LOGICA DI GIOCO ---
+        // --- 3. GESTIONE CARICAMENTO ASSET ---
+
+        function checkAssetsLoaded() {
+            loadedCount++;
+            if (loadedCount === totalToLoad) {
+                console.log("Tutti gli asset caricati correttamente!");
+                init(); // Avvia il gioco solo quando TUTTO è pronto
+            }
+        }
+
+        spriteSheet.onload = checkAssetsLoaded;
+        bgImage.onload = checkAssetsLoaded;
+
+        spriteSheet.onerror = () => alert("Errore: Impossibile caricare sprite_sheet.png da GitHub.");
+        bgImage.onerror = () => alert("Errore: Impossibile caricare background.png da GitHub.");
+
+        // AVVIA IL CARICAMENTO
+        spriteSheet.src = SPRITE_URL;
+        bgImage.src = BG_URL;
+
+
+        // --- 4. LOGICA DI GIOCO ---
 
         function init() {
             grid = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(0));
@@ -122,10 +149,13 @@
             }
         }
 
-        // --- 4. MOTORE GRAFICO ---
+        // --- 5. MOTORE GRAFICO ---
 
         function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // --- NUOVO: Disegna lo Sfondo PRIMA di tutto il resto ---
+            ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
+
+            // ctx.clearRect(0, 0, canvas.width, canvas.height); // Non più necessario se disegniamo lo sfondo sopra
             scoreDisplay.innerText = score;
 
             for(let r=0; r<GRID_SIZE; r++) {
@@ -133,7 +163,7 @@
                     let x = TILE_MARGIN + c * (TILE_SIZE + TILE_MARGIN);
                     let y = TILE_MARGIN + r * (TILE_SIZE + TILE_MARGIN);
 
-                    // Disegna sfondo cella vuota
+                    // Disegna sfondo cella vuota (reso trasparente nel CSS per far vedere lo sfondo)
                     ctx.fillStyle = "rgba(238, 228, 218, 0.35)";
                     ctx.beginPath();
                     ctx.roundRect(x, y, TILE_SIZE, TILE_SIZE, 8);
@@ -153,15 +183,12 @@
             const col = index % CALIBRATION.cols;
             const row = Math.floor(index / CALIBRATION.cols);
 
-            // Dimensioni dinamiche basate sull'immagine reale caricata
             const sw = spriteSheet.width / CALIBRATION.cols;
             const sh = spriteSheet.height / CALIBRATION.rows;
 
-            // Coordinate di ritaglio con applicazione degli offset
             const sx = col * sw + CALIBRATION.offsetX;
             const sy = row * sh + CALIBRATION.offsetY;
 
-            // Applichiamo lo zoom per evitare che i bordi dell'animale tocchino i margini della tessera
             const padding = (TILE_SIZE * (1 - CALIBRATION.zoom)) / 2;
             const drawSize = TILE_SIZE * CALIBRATION.zoom;
 
@@ -172,7 +199,7 @@
             );
         }
 
-        // --- 5. MOVIMENTI E INPUT ---
+        // --- 6. MOVIMENTI E INPUT ---
 
         function slide(row) {
             let arr = row.filter(val => val);
@@ -224,16 +251,6 @@
                 draw();
             }
         });
-
-        // Caricamento e avvio
-        spriteSheet.onload = () => {
-            console.log("Sprite caricata correttamente!");
-            init();
-        };
-
-        spriteSheet.onerror = () => {
-            alert("Errore: Impossibile caricare le immagini da GitHub.");
-        };
 
     </script>
 </body>
